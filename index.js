@@ -385,7 +385,7 @@ if (sesion?.proceso === "mezcla") {
   if (estado === "mezcla_confirmar_fecha") {
     const choice = getChoiceFromRequest(req, texto);
     const hoy = hoyDDMMYYYY();
-    if (choice === "confirmar_fecha" || choice === "1") {
+    if (choice === "confirmar_fecha" || choice === "1" ||choice === "confirmar (hoy)") {
       datos.fecha = hoy;
       sesion.estado = "mezcla_responsable";
       try {
@@ -409,7 +409,7 @@ if (sesion?.proceso === "mezcla") {
       return res.type("text/xml").send(twiml.toString());
     }
 
-    if (choice === "cambiar_fecha" || choice === "2") {
+    if (choice === "cambiar_fecha" || choice === "2" || choice === "cambiar fecha") {
       sesion.estado = "mezcla_fecha_manual";
       msg.body("📅 Escriba la *fecha del reporte* (dd/mm/aaaa):");
       return res.type("text/xml").send(twiml.toString());
@@ -606,7 +606,7 @@ if (sesion?.proceso === "siembra") {
   if (estado === "siembra_confirmar_fecha") {
     const choice = getChoiceFromRequest(req, texto); // 'confirmar_fecha' | 'cambiar_fecha' | '1' | '2'
     const hoy = hoyDDMMYYYY();
-    if (choice === "confirmar_fecha" || choice === "1") {
+    if (choice === "confirmar_fecha" || choice === "1" || choice === "confirmar (hoy)") {
       datos.fecha = hoy;
       sesion.estado = "siembra_variedad";
       // Cargar variedades
@@ -623,7 +623,7 @@ if (sesion?.proceso === "siembra") {
       return res.type("text/xml").send(twiml.toString());
     }
 
-    if (choice === "cambiar_fecha" || choice === "2") {
+    if (choice === "cambiar_fecha" || choice === "2" || choice === "cambiar fecha") {
       sesion.estado = "siembra_fecha_manual";
       msg.body("📅 Escriba la *fecha del reporte* (dd/mm/aaaa):");
       return res.type("text/xml").send(twiml.toString());
