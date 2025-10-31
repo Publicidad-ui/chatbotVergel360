@@ -342,7 +342,6 @@ app.post("/webhook", async(req, res) => {
   // Enviar MENÚ con botones usando tu ContentSid
   if (/^(hola|inicio)$/i.test(texto)) {
   sesiones[from] = { estado: null, proceso: null, datos: {} };
-  msg = []
   return enviarMenuBotones({ to: from, msg, res, twiml });
 }
 
