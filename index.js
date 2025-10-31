@@ -44,7 +44,7 @@ async function enviarMenuBotones({ to, msg, res, twiml }) {
     });
 
     console.log("[menu] Content enviado, sid:", r.data.sid);
-    res.sendStatus(200);
+    res.sendStatus(204).end();
   } catch (e) {
     console.error("[menu] ERROR Content:", e?.response?.data || e.message);
     msg.body("👋 Hola, selecciona el proceso a registrar: \n1. Mezcla\n2. Siembra\n(Escribe la opción)");
@@ -85,7 +85,7 @@ async function enviarConfirmarFecha({ to, fecha, msg, res, twiml }) {
     });
 
     console.log("[confirmar_fecha] Content enviado, sid:", r.data.sid);
-    res.sendStatus(200);
+    res.sendStatus(204).end();
   } catch (e) {
     console.error("[confirmar_fecha] ERROR Content:", e?.response?.data || e.message);
     // Fallback a texto si falla el Content
