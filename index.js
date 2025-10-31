@@ -113,6 +113,9 @@ function getChoiceFromRequest(req, fallbackText) {
     req.body?.Interactive?.List?.Id ||
     null;
 
+    const choice = btnIdRaw || listIdRaw || fallbackText;
+    console.log("🔍 Choice detectado:", choice);
+
   const btnId  = btnIdRaw  ? String(btnIdRaw).trim().toLowerCase()  : null;
   const listId = listIdRaw ? String(listIdRaw).trim().toLowerCase() : null;
 
@@ -320,6 +323,8 @@ function renderLista(items, mapLabel, max = 10) {
 ////
 
 app.post("/webhook", async(req, res) => {
+  console.log("📩 Webhook recibido:");
+  console.log(JSON.stringify(req.body, null, 2));
   const from = req.body.From;
   const texto = (req.body.Body || "").trim();
   const twiml = new MessagingResponse();
