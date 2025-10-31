@@ -44,6 +44,7 @@ async function enviarMenuBotones({ to, msg, res, twiml }) {
     });
 
     console.log("[menu] Content enviado, sid:", r.data.sid);
+    twiml.messageList = [];
     res.sendStatus(200);
   } catch (e) {
     console.error("[menu] ERROR Content:", e?.response?.data || e.message);
@@ -85,6 +86,7 @@ async function enviarConfirmarFecha({ to, fecha, msg, res, twiml }) {
     });
 
     console.log("[confirmar_fecha] Content enviado, sid:", r.data.sid);
+    twiml.messageList = [];
     res.sendStatus(200);
   } catch (e) {
     console.error("[confirmar_fecha] ERROR Content:", e?.response?.data || e.message);
