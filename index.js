@@ -101,20 +101,27 @@ async function enviarConfirmarFecha({ to, fecha, msg, res, twiml }) {
 
 
 function getChoiceFromRequest(req, fallbackText) {
-  // Botón (Quick Reply)
-  const btnId = req.body?.Interactive?.Button?.Reply?.Id
-            || req.body?.ButtonResponse?.id
-            || null;
+  // Quick Reply / Buttons
+  const btnIdRaw =
+    req.body?.ButtonResponse?.id ||
+    req.body?.Interactive?.Button?.Reply?.Id ||
+    null;
 
-  // Lista (por si luego se usa)
-  const listId = req.body?.Interactive?.List?.Id
-              || req.body?.list_reply?.id
-              || null;
+  // List Picker
+  const listIdRaw =
+    req.body?.list_reply?.id ||
+    req.body?.Interactive?.List?.Id ||
+    null;
 
-  if (btnId) return btnId;
+  const btnId  = btnIdRaw  ? String(btnIdRaw).trim().toLowerCase()  : null;
+  const listId = listIdRaw ? String(listIdRaw).trim().toLowerCase() : null;
+
+  if (btnId)  return btnId;
   if (listId) return listId;
-  return (fallbackText || '').trim().toLowerCase(); // fallback: "1", "2", "mezcla", "siembra", etc.
+
+  return String(fallbackText || '').trim().toLowerCase();
 }
+
 
 ////
 
