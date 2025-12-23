@@ -542,12 +542,25 @@ if (sesion?.proceso === "mezcla") {
       return res.type("text/xml").send(twiml.toString());
     }
     datos.progro_gramos = Number(texto);
+    sesion.estado = "mezcla_cant_lonas";
+    msg.body("🧵 Ingrese *cantidad de lonas* (entero ≥ 0):");
+    return res.type("text/xml").send(twiml.toString());
+  }
+
+  // (6) Cantidad de lonas (≥ 0, entero)
+  if (estado === "mezcla_cant_lonas") {
+    if (!esEnteroNoNegativo(texto)) {
+      msg.body("❗ Debe ser un *entero ≥ 0*. Intente de nuevo:");
+      return res.type("text/xml").send(twiml.toString());
+    }
+    datos.cant_lonas = Number(texto);
+
     sesion.estado = "mezcla_bandejas128";
     msg.body("🧩 Cantidad de *bandejas 128* (entero ≥ 0):");
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (6) Bandejas 128 (≥ 0, entero)
+  // (7) Bandejas 128 (≥ 0, entero)
   if (estado === "mezcla_bandejas128") {
     if (!esEnteroNoNegativo(texto)) {
       msg.body("❗ Debe ser un *entero ≥ 0*. Intente de nuevo:");
@@ -559,7 +572,7 @@ if (sesion?.proceso === "mezcla") {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (7) Bandejas 200 (≥ 0, entero) → finalizar
+  // (8) Bandejas 200 (≥ 0, entero) → finalizar
   if (estado === "mezcla_bandejas200") {
     if (!esEnteroNoNegativo(texto)) {
       msg.body("❗ Debe ser un *entero ≥ 0*. Intente de nuevo:");
@@ -580,6 +593,7 @@ if (sesion?.proceso === "mezcla") {
           `🪵 Turba (bultos): ${Number(datos.turba_bultos || 0)}`,
           `🌾 Cascarilla (bultos): ${Number(datos.cascarilla_bultos || 0)}`,
           `🧪 Progro (g): ${Number(datos.progro_gramos || 0)} g`,
+          `🧵 Lonas: ${Number(datos.cant_lonas || 0)}`,
           `🧩 Bandejas 128: ${Number(datos.bandejas128 || 0)}`,
           `🧩 Bandejas 200: ${Number(datos.bandejas200 || 0)}`,
           `📦 Total bandejas: ${totalBandejas}`
