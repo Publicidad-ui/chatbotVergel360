@@ -183,6 +183,37 @@ function norm(s) {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
+function parseRangosIndices(input, max) {
+  // input: "1,3,5-10" (1-based)
+  const s = String(input || "").trim().replace(/\s+/g, "");
+  if (!s) return { ok:false, error:"Vacío" };
+
+  const parts = s.split(",").filter(Boolean);
+  const set = new Set();
+
+  for (const part of parts) {
+    // rango 5-10
+    const m = part.match(/^(\d+)-(\d+)$/);
+    if (m) {
+      let a = Number(m[1]), b = Number(m[2]);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      if (a > b) [a,b] = [b,a];
+      for (let i=a; i<=b; i++) set.add(i);
+      continue;
+    }
+
+    // número simple
+    if (/^\d+$/.test(part)) set.add(Number(part));
+    else return { ok:false, error:`Formato inválido: "${part}"` };
+  }
+
+  const out = [...set].sort((x,y)=>x-y);
+  // validar rango
+  const bad = out.find(n => n < 1 || n > max);
+  if (bad) return { ok:false, error:`Número fuera de rango: ${bad} (1-${max})` };
+
+  return { ok:true, indices: out }; // 1-based
+}
 
 
 // === API helpers ===
@@ -681,22 +712,25 @@ if (sesion?.proceso === "siembra") {
       const idx = Number(texto) - 1;
       if (idx >= 0 && idx < lista.length) {
         const sel = lista[idx];
+        // ✅ Guardar variedad
         datos.variedad_id = sel.id;
         datos.variedad_nombre = sel.nombre;
 
-        // Cargar empaques de esa variedad
-        const empaques = await getEmpaquesPorVariedad(sel.id);
-        if (!empaques.length) {
-          msg.body("⚠️ Esta variedad no tiene empaques disponibles. Elija otra variedad o escriba *inicio*.");
+        // ✅ NUEVO: cargar facturas relacionadas a esa variedad
+        const facturas = await getFacturasPorVariedad(sel.id); // <-- backend nuevo
+        if (!facturas.length) {
+          msg.body("⚠️ Esta variedad no tiene *facturas* disponibles. Elija otra variedad o escriba *inicio*.");
           return res.type("text/xml").send(twiml.toString());
         }
-        sesion._empaques = empaques;
-        sesion.estado = "siembra_empaque";
+        sesion._facturas = facturas;
+        sesion.estado = "siembra_factura";
+
         msg.body(
-          `📦 *Código de empaque* para *${sel.nombre}*\nElija por número:\n\n` +
-          renderLista(empaques, it => `${it.codigo} (stock: ${it.stock_disponible})`, 10)
+          `🧾 *Factura* para *${sel.nombre}*\nElija por número:\n\n` +
+          renderLista(facturas, it => `${it.label || it.numero || it.id}`, 10)
         );
         return res.type("text/xml").send(twiml.toString());
+
       }
       msg.body(`Número fuera de rango (1-${lista.length}). Intente de nuevo.`);
       return res.type("text/xml").send(twiml.toString());
@@ -710,18 +744,19 @@ if (sesion?.proceso === "siembra") {
       datos.variedad_id = sel.id;
       datos.variedad_nombre = sel.nombre;
 
-      const empaques = await getEmpaquesPorVariedad(sel.id);
-      if (!empaques.length) {
-        msg.body("⚠️ Esta variedad no tiene empaques disponibles. Elija otra variedad o escriba *inicio*.");
+      const facturas = await getFacturasPorVariedad(sel.id);
+      if (!facturas.length) {
+          msg.body("⚠️ Esta variedad no tiene *facturas* disponibles. Elija otra variedad o escriba *inicio*.");
+          return res.type("text/xml").send(twiml.toString());
+        }
+        sesion._facturas = facturas;
+        sesion.estado = "siembra_factura";
+
+        msg.body(
+          `🧾 *Factura* para *${sel.nombre}*\nElija por número:\n\n` +
+          renderLista(facturas, it => `${it.label || it.numero || it.id}`, 10)
+        );
         return res.type("text/xml").send(twiml.toString());
-      }
-      sesion._empaques = empaques;
-      sesion.estado = "siembra_empaque";
-      msg.body(
-        `📦 *Código de empaque* para *${sel.nombre}*\nElija por número:\n\n` +
-        renderLista(empaques, it => `${it.codigo} (stock: ${it.stock_disponible})`, 10)
-      );
-      return res.type("text/xml").send(twiml.toString());
     }
 
     if (hits.length > 1) {
@@ -737,11 +772,11 @@ if (sesion?.proceso === "siembra") {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (3) Empaque
-  if (estado === "siembra_empaque") {
-    const lista = sesion._empaques || [];
+  // (3) Factura
+  if (estado === "siembra_factura") {
+    const lista = sesion._facturas || [];
     if (!lista.length) {
-      msg.body("⚠️ No hay empaques para esta variedad. Escriba *inicio* para reiniciar.");
+      msg.body("⚠️ Sin lista de facturas. Escriba *inicio* para reiniciar.");
       return res.type("text/xml").send(twiml.toString());
     }
     if (!/^\d+$/.test(texto)) {
@@ -755,21 +790,62 @@ if (sesion?.proceso === "siembra") {
     }
 
     const sel = lista[idx];
-    datos.empaque_id = sel.id;
-    datos.empaque_codigo = sel.codigo;
-    datos.empaque_stock_disponible = Number(sel.stock_disponible || 0);
+    datos.factura_id = sel.id;
+    datos.factura_label = sel.label || sel.numero || sel.id;
 
-    // Cargar bandejas
+    // ✅ NUEVO: cargar paquetes por (variedad + factura)
+    const paquetes = await getPaquetesPorFacturaYVariedad({
+      variedad_id: datos.variedad_id,
+      factura_id: datos.factura_id
+    }); // <-- backend nuevo
+
+    if (!paquetes.length) {
+      msg.body("⚠️ Esta factura no tiene *paquetes* disponibles para esa variedad. Elija otra factura o escriba *inicio*.");
+      return res.type("text/xml").send(twiml.toString());
+    }
+
+    sesion._paquetes = paquetes;
+    sesion.estado = "siembra_empaque";
+
+    msg.body(
+      `📦 *Códigos de empaque* para *${datos.variedad_nombre}* (Factura: *${datos.factura_label}*)\n` +
+      `Responda con números separados por coma o rangos:\n` +
+      `Ej: *1,3,5-10*\n\n` +
+      renderLista(paquetes, it => `${it.codigo} (stock: ${it.stock_disponible})`, 10)
+    );
+    return res.type("text/xml").send(twiml.toString());
+  }
+
+  // (4) Empaque
+  if (estado === "siembra_empaque") {
+    const lista = sesion._paquetes || [];
+    if (!lista.length) {
+      msg.body("⚠️ No hay paquetes para esta factura/variedad. Escriba *inicio* para reiniciar.");
+      return res.type("text/xml").send(twiml.toString());
+    }
+
+    const parsed = parseRangosIndices(texto, lista.length);
+    if (!parsed.ok) {
+      msg.body(`❗ ${parsed.error}\nUse ejemplo: *1,3,5-10* (1-${lista.length}).`);
+      return res.type("text/xml").send(twiml.toString());
+    }
+
+    const idxs = parsed.indices.map(n => n - 1);
+    const seleccion = idxs.map(i => lista[i]);
+
+    // ✅ guardar lista de paquetes
+    datos.empaque_id = seleccion.map(x => x.id);
+    datos.empaque_codigo = seleccion.map(x => x.codigo);
+    datos.empaque_stock_total = seleccion.reduce((a,x)=>a + Number(x.stock_disponible || 0), 0);
+
+    // ✅ cargar bandejas igual que antes
     const bandejas = await getBandejas();
     if (!bandejas.length) {
       msg.body("⚠️ No hay tipos de bandeja configurados. Contacte a sistemas.");
       return res.type("text/xml").send(twiml.toString());
     }
 
-    // Si quieres filtrar para solo 128/200 a partir del nombre:
-    const fil = bandejas.filter(b =>
-      /128/.test(b.nombre) || /200/.test(b.nombre)
-    );
+    const fil = bandejas.filter(b => /128/.test(b.nombre) || /200/.test(b.nombre));
     sesion._bandejas = fil.length ? fil : bandejas;
 
     sesion.estado = "siembra_bandeja";
@@ -780,7 +856,7 @@ if (sesion?.proceso === "siembra") {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (4) Tipo bandeja
+  // (5) Tipo bandeja
   if (estado === "siembra_bandeja") {
     const lista = sesion._bandejas || [];
     if (!lista.length) {
@@ -803,7 +879,14 @@ if (sesion?.proceso === "siembra") {
     datos.bandeja_cavidades = Number(sel.cantidad || 0); // p.ej. 128
 
     // consulta capacidad (mezcla y stock) antes de pedir la cantidad
-    const cap = await getCapacidad({ cavidades: datos.bandeja_cavidades, empaque_id: datos.empaque_id });
+    const cap = await getCapacidad({
+      cavidades: datos.bandeja_cavidades,
+      variedad_id: datos.variedad_id,
+      factura_id: datos.factura_id,
+      empaque_ids: datos.empaque_ids,
+      stock_total: datos.empaque_stock_total
+    });
+
     if (!cap.ok) {
       msg.body(`⚠️ No se pudo calcular capacidad: ${cap.error || 'desconocido'}. Intente de nuevo más tarde.`);
       return res.type("text/xml").send(twiml.toString());
@@ -824,7 +907,7 @@ if (sesion?.proceso === "siembra") {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (5) Cantidad de bandejas (validación contra mezcla y stock)
+  // (6) Cantidad de bandejas (validación contra mezcla y stock)
   if (estado === "siembra_cantidad_bandejas") {
     if (!esEnteroNoNegativo(texto) || Number(texto) <= 0) {
       msg.body("❗ Debe ser un *entero > 0*. Intente de nuevo:");
@@ -851,7 +934,7 @@ if (sesion?.proceso === "siembra") {
 
     // Cálculos: 
     const cav = Number(datos.bandeja_cavidades || 1);
-    const stock = Number(datos.empaque_stock_disponible || 0);
+    const stock = Number(datos.empaque_stock_total || 0);
 
     datos.total_cavidades = cav * cant;
     const redondeoDiez = Math.floor(datos.total_cavidades / 10) * 10;
@@ -863,7 +946,7 @@ if (sesion?.proceso === "siembra") {
   }
 
 
-  // (6) Inconsistencia (opcional)
+  // (7) Inconsistencia (opcional)
   if (estado === "siembra_inconsistencia") {
     datos.inconsistencia = (texto === "-") ? "" : texto;
     sesion.estado = "siembra_observaciones";
@@ -871,7 +954,7 @@ if (sesion?.proceso === "siembra") {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // (7) Germinación (opcional) → finalizar
+  // (8) Germinación (opcional) → finalizar
   if (estado === "siembra_observaciones") {
     datos.observaciones = (texto === "-") ? "" : texto;
 
@@ -888,9 +971,12 @@ if (sesion?.proceso === "siembra") {
       variedad_id: datos.variedad_id,
       variedad_nombre: datos.variedad_nombre,
 
+      factura_id: datos.factura_id,
+      factura_label: datos.factura_label,
+
       empaque_id: datos.empaque_id,
       empaque_codigo: datos.empaque_codigo,
-      empaque_stock_disponible: datos.empaque_stock_disponible,
+      empaque_stock_total: datos.empaque_stock_total,
 
       bandeja_id: datos.bandeja_id,
       bandeja_nombre: datos.bandeja_nombre,
@@ -909,7 +995,7 @@ if (sesion?.proceso === "siembra") {
         const resumen = [
           `📅 Fecha: ${payload.fecha}`,
           `🧬 Variedad: ${payload.variedad_nombre}`,
-          `📦 Empaque: ${payload.empaque_codigo} (stock: ${payload.empaque_stock_disponible})`,
+          `📦 Paquetes: ${payload.empaque_codigo.length} (stock total: ${payload.empaque_stock_total})`,
           `🧩 Bandeja: ${payload.bandeja_nombre} (${payload.bandeja_cavidades} cavidades)`,
           `🔢 Bandejas sembradas: ${payload.cantidad_bandejas_sembradas}`,
           `🧮 Total cavidades: ${payload.total_cavidades}`,
