@@ -700,7 +700,7 @@ if (sesion?.proceso === "siembra") {
       sesion._variedades = lista;
       msg.body(
         `🧬 *Variedad*\nElija por número o escriba parte del nombre:\n\n` +
-        renderLista(lista, it => it.nombre, 10)
+        renderLista(lista, it => it.nombre, lista.length)
       );
       return res.type("text/xml").send(twiml.toString());
     }
@@ -731,7 +731,7 @@ if (sesion?.proceso === "siembra") {
     sesion._variedades = lista;
     msg.body(
       `🧬 *Variedad*\nElija por número o escriba parte del nombre:\n\n` +
-      renderLista(lista, it => it.nombre, 10)
+      renderLista(lista, it => it.nombre, lista.length)
     );
     return res.type("text/xml").send(twiml.toString());
   }
