@@ -883,7 +883,7 @@ if (sesion?.proceso === "siembra") {
       cavidades: datos.bandeja_cavidades,
       variedad_id: datos.variedad_id,
       factura_id: datos.factura_id,
-      empaque_ids: datos.empaque_ids,
+      empaque_id: datos.empaque_id,
       stock_total: datos.empaque_stock_total
     });
 
