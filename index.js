@@ -764,7 +764,7 @@ if (sesion?.proceso === "siembra") {
 
         msg.body(
           `🧾 *Factura* para *${sel.nombre}*\nElija por número:\n\n` +
-          renderLista(facturas, it => `${it.label || it.numero || it.id}`, 10)
+          renderLista(facturas, it => `${it.label || it.numero || it.id}`, facturas.length)
         );
         return res.type("text/xml").send(twiml.toString());
 
@@ -791,7 +791,7 @@ if (sesion?.proceso === "siembra") {
 
         msg.body(
           `🧾 *Factura* para *${sel.nombre}*\nElija por número:\n\n` +
-          renderLista(facturas, it => `${it.label || it.numero || it.id}`, 10)
+          renderLista(facturas, it => `${it.label || it.numero || it.id}`, facturas.length)
         );
         return res.type("text/xml").send(twiml.toString());
     }
@@ -800,7 +800,7 @@ if (sesion?.proceso === "siembra") {
       sesion._variedades = hits;
       msg.body(
         `Se encontraron varias coincidencias, elija número:\n` +
-        renderLista(hits, it => it.nombre, 10)
+        renderLista(hits, it => it.nombre, hits.length)
       );
       return res.type("text/xml").send(twiml.toString());
     }
@@ -848,7 +848,7 @@ if (sesion?.proceso === "siembra") {
       `📦 *Códigos de empaque* para *${datos.variedad_nombre}* (Factura: *${datos.factura_label}*)\n` +
       `Responda con números separados por coma o rangos:\n` +
       `Ej: *1,3,5-10*\n\n` +
-      renderLista(paquetes, it => `${it.codigo} (stock: ${it.stock_disponible})`, 10)
+      renderLista(paquetes, it => `${it.codigo} (stock: ${it.stock_disponible})`, paquetes.length)
     );
     return res.type("text/xml").send(twiml.toString());
   }
