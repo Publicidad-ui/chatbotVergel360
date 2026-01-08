@@ -302,17 +302,40 @@ async function getVariedades() {
     .filter(x => x.id && x.nombre);
 }
 
-async function getEmpaquesPorVariedad(variedadId) {
+async function getFacturasPorVariedad(variedadId) {
   const base = (process.env.SIEMBRA_API_BASE || "").trim();
   if (!base || !variedadId) return [];
-  const data = await apiGetSiembra(base, { action: "empaques", variedad_id: variedadId });
+
+  const data = await apiGetSiembra(base, { action: "facturas", variedad_id: variedadId });
   if (!data || !data.ok || !Array.isArray(data.items)) return [];
+
+  // Esperamos {id, label}
+  return data.items
+    .map(it => ({
+      id: String(it.id || "").trim(),
+      label: String(it.label || it.numero || it.id || "").trim()
+    }))
+    .filter(x => x.id && x.label);
+}
+
+async function getPaquetesPorFacturaYVariedad({ variedad_id, factura_id }) {
+  const base = (process.env.SIEMBRA_API_BASE || "").trim();
+  if (!base || !variedad_id || !factura_id) return [];
+
+  const data = await apiGetSiembra(base, {
+    action: "paquetes",
+    variedad_id,
+    factura_id
+  });
+
+  if (!data || !data.ok || !Array.isArray(data.items)) return [];
+
   // Esperamos {id, codigo, stock_disponible}
   return data.items
     .map(it => ({
-      id: String(it.id||"").trim(),
-      codigo: String(it.codigo||"").trim(),
-      stock_disponible: Number(it.stock_disponible||0)
+      id: String(it.id || "").trim(),
+      codigo: String(it.codigo || "").trim(),
+      stock_disponible: Number(it.stock_disponible || 0)
     }))
     .filter(x => x.id && x.codigo);
 }
@@ -332,16 +355,30 @@ async function getBandejas() {
     .filter(x => x.id && x.nombre && x.cantidad>0);
 }
 
-async function getCapacidad({ cavidades, empaque_id }) {
-  const base = (process.env.SIEMBRA_API_BASE || "").trim(); 
-  const data = await apiGetSiembra(base, { action: "capacidad", cavidades, empaque_id, debug:"1" });
-  if (!data || !data.ok) {
-    return { ok:false, error: data?.error || 'Error consultando capacidad' };
+async function getCapacidad({ cavidades, empaque_ids }) {
+  const base = (process.env.SIEMBRA_API_BASE || "").trim();
+  if (!base) return { ok:false, error:"Falta SIEMBRA_API_BASE" };
+
+  const ids = Array.isArray(empaque_ids) ? empaque_ids : [];
+  const empaque_ids_csv = ids.map(x => String(x).trim()).filter(Boolean).join(",");
+
+  if (!empaque_ids_csv) {
+    return { ok:false, error:"Falta empaque_ids (lista de paquetes)" };
   }
+
+  const data = await apiGetSiembra(base, {
+    action: "capacidad",
+    cavidades,
+    empaque_ids: empaque_ids_csv,
+    debug: "1"
+  });
+
+  if (!data || !data.ok) {
+    return { ok:false, error: data?.error || "Error consultando capacidad" };
+  }
+
   return { ok:true, ...data };
 }
-
-
 
 // Renderiza lista numerada (corta en N ítems)
 function renderLista(items, mapLabel, max = 10) {
@@ -834,7 +871,7 @@ if (sesion?.proceso === "siembra") {
     const seleccion = idxs.map(i => lista[i]);
 
     // ✅ guardar lista de paquetes
-    datos.empaque_id = seleccion.map(x => x.id);
+    datos.empaque_ids = seleccion.map(x => x.id);
     datos.empaque_codigo = seleccion.map(x => x.codigo);
     datos.empaque_stock_total = seleccion.reduce((a,x)=>a + Number(x.stock_disponible || 0), 0);
 
@@ -883,7 +920,7 @@ if (sesion?.proceso === "siembra") {
       cavidades: datos.bandeja_cavidades,
       variedad_id: datos.variedad_id,
       factura_id: datos.factura_id,
-      empaque_id: datos.empaque_id,
+      empaque_ids: datos.empaque_ids,
       stock_total: datos.empaque_stock_total
     });
 
@@ -974,7 +1011,7 @@ if (sesion?.proceso === "siembra") {
       factura_id: datos.factura_id,
       factura_label: datos.factura_label,
 
-      empaque_id: datos.empaque_id,
+      empaque_ids: datos.empaque_ids,
       empaque_codigo: datos.empaque_codigo,
       empaque_stock_total: datos.empaque_stock_total,
 
