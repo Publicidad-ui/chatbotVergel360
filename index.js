@@ -3,21 +3,24 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const { MessagingResponse } = require("twilio").twiml;
+const qs = require("querystring");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.json());
 
 require("dotenv").config();
 
 const sesiones = {};
 
-///POST NOTIFICACIONES
-//HELPER
+/** =========================
+ *  NOTIFICACIONES WHATSAPP
+ *  ========================= */
 function assertEnv() {
   const TWILIO_ACCOUNT_SID = (process.env.TWILIO_ACCOUNT_SID || "").trim();
   const TWILIO_AUTH_TOKEN = (process.env.TWILIO_AUTH_TOKEN || "").trim();
   const TWILIO_WHATSAPP_FROM = (process.env.TWILIO_WHATSAPP_FROM || "").trim();
-  const CONTENT_SID_APROB = (process.env.CONTENT_SID_APROB || "").trim(); 
+  const CONTENT_SID_APROB = (process.env.CONTENT_SID_APROB || "").trim();
 
   if (!TWILIO_ACCOUNT_SID) throw new Error("Missing TWILIO_ACCOUNT_SID");
   if (!TWILIO_AUTH_TOKEN) throw new Error("Missing TWILIO_AUTH_TOKEN");
@@ -27,7 +30,9 @@ function assertEnv() {
   return { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, CONTENT_SID_APROB };
 }
 
-//
+// ✅ (Opcional pero recomendado) Healthcheck rápido
+app.get("/health", (req, res) => res.json({ ok: true }));
+
 app.post("/notify/whatsapp", async (req, res) => {
   try {
     const env = assertEnv();
@@ -39,31 +44,30 @@ app.post("/notify/whatsapp", async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Field "to" debe iniciar con "whatsapp:"' });
     }
 
-    // Twilio Messages API (Content templates)
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;
 
     const payload = qs.stringify({
       To: to,
       From: env.TWILIO_WHATSAPP_FROM,
       ContentSid: env.CONTENT_SID_APROB,
-      ContentVariables: JSON.stringify(variables)
+      ContentVariables: JSON.stringify(variables),
     });
 
     const r = await axios.post(url, payload, {
-      auth: { username: TWILIO_ACCOUNT_SID, password: TWILIO_AUTH_TOKEN },
-      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+      auth: { username: env.TWILIO_ACCOUNT_SID, password: env.TWILIO_AUTH_TOKEN },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 30000,
     });
 
     return res.json({ ok: true, sid: r.data?.sid, status: r.data?.status });
   } catch (e) {
-    console.error(e);
+    console.error("[/notify/whatsapp] ERROR:", e?.response?.data || e.message);
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 ////
 
 /* MENÚ DESDE PLANTILLA TWILIO */
-const qs = require("querystring");
 
 function isSandbox() {
   return (process.env.TWILIO_WHATSAPP_FROM || "").trim() === "whatsapp:+14155238886";
