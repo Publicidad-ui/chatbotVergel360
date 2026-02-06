@@ -11,6 +11,57 @@ require("dotenv").config();
 
 const sesiones = {};
 
+///POST NOTIFICACIONES
+//HELPER
+function assertEnv() {
+  const TWILIO_ACCOUNT_SID = (process.env.TWILIO_ACCOUNT_SID || "").trim();
+  const TWILIO_AUTH_TOKEN = (process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const TWILIO_WHATSAPP_FROM = (process.env.TWILIO_WHATSAPP_FROM || "").trim();
+  const CONTENT_SID_APROB = (process.env.CONTENT_SID_APROB || "").trim(); 
+
+  if (!TWILIO_ACCOUNT_SID) throw new Error("Missing TWILIO_ACCOUNT_SID");
+  if (!TWILIO_AUTH_TOKEN) throw new Error("Missing TWILIO_AUTH_TOKEN");
+  if (!TWILIO_WHATSAPP_FROM) throw new Error("Missing TWILIO_WHATSAPP_FROM");
+  if (!CONTENT_SID_APROB) throw new Error("Missing CONTENT_SID_APROB");
+
+  return { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, CONTENT_SID_APROB };
+}
+
+//
+app.post("/notify/whatsapp", async (req, res) => {
+  try {
+    const env = assertEnv();
+
+    const to = String(req.body?.to || "").trim();
+    const variables = req.body?.variables || {};
+
+    if (!to.startsWith("whatsapp:")) {
+      return res.status(400).json({ ok: false, error: 'Field "to" debe iniciar con "whatsapp:"' });
+    }
+
+    // Twilio Messages API (Content templates)
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+
+    const payload = qs.stringify({
+      To: to,
+      From: env.TWILIO_WHATSAPP_FROM,
+      ContentSid: env.CONTENT_SID_APROB,
+      ContentVariables: JSON.stringify(variables)
+    });
+
+    const r = await axios.post(url, payload, {
+      auth: { username: TWILIO_ACCOUNT_SID, password: TWILIO_AUTH_TOKEN },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    });
+
+    return res.json({ ok: true, sid: r.data?.sid, status: r.data?.status });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+////
+
 /* MENÚ DESDE PLANTILLA TWILIO */
 const qs = require("querystring");
 
