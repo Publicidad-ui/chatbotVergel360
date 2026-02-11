@@ -44,13 +44,19 @@ app.post("/notify/whatsapp", async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Field "to" debe iniciar con "whatsapp:"' });
     }
 
+    // ✅ fuerza strings para Twilio
+    const safeVars = {};
+    ["1","2","3","4"].forEach(k => {
+      safeVars[k] = String(variables?.[k] ?? (k === "2" ? " " : "-"));
+    });
+
     const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;
 
     const payload = qs.stringify({
       To: to,
       From: env.TWILIO_WHATSAPP_FROM,
       ContentSid: env.CONTENT_SID_APROB,
-      ContentVariables: JSON.stringify(variables),
+      ContentVariables: JSON.stringify(safeVars),
     });
 
     const r = await axios.post(url, payload, {
@@ -61,8 +67,17 @@ app.post("/notify/whatsapp", async (req, res) => {
 
     return res.json({ ok: true, sid: r.data?.sid, status: r.data?.status });
   } catch (e) {
-    console.error("[/notify/whatsapp] ERROR:", e?.response?.data || e.message);
-    return res.status(500).json({ ok: false, error: String(e?.message || e) });
+    const status = e?.response?.status || 500;
+    const data = e?.response?.data || null;
+
+    console.error("[/notify/whatsapp] ERROR:", status, data || e.message);
+
+    // ✅ devuelve el detalle de Twilio
+    return res.status(status).json({
+      ok: false,
+      error: e?.message || String(e),
+      twilio: data
+    });
   }
 });
 ////
